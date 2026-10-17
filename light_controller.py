@@ -1,90 +1,197 @@
+import os
 import time
+from gpiozero import LED
 from transcriber import VoskAudioTranscriber
 
 # ==========================================
-# HARDWARE CONFIGURATION (Raspberry Pi GPIO)
+# GPIO PIN CONFIGURATION (BCM Numbers)
 # ==========================================
-# If running on Raspberry Pi, uncomment the RPi imports:
-# import RPi.GPIO as GPIO
-# RED_PIN = 17
-# YELLOW_PIN = 27
-# GREEN_PIN = 22
-# GPIO.setmode(GPIO.BCM)
-# GPIO.setup([RED_PIN, YELLOW_PIN, GREEN_PIN], GPIO.OUT, initial=GPIO.LOW)
+RED_PIN = 17      # Error: File missing, corrupt, or wrong format
+YELLOW_PIN = 27   # Warning: No speech recognized OR unrecognized command
+GREEN_PIN = 22    # Command: Turns ON/OFF based on voice commands
 
-def set_light(red: bool = False, yellow: bool = False, green: bool = False):
-    """Controls the LED states (replace print statements with GPIO calls)."""
-    # GPIO.output(RED_PIN, GPIO.HIGH if red else GPIO.LOW)
-    # GPIO.output(YELLOW_PIN, GPIO.HIGH if yellow else GPIO.LOW)
-    # GPIO.output(GREEN_PIN, GPIO.HIGH if green else GPIO.LOW)
-    print(f"  [LED STATE] Red: {'ON' if red else 'OFF'} | Yellow: {'ON' if yellow else 'OFF'} | Green: {'ON' if green else 'OFF'}")
+red_led = LED(RED_PIN)
+yellow_led = LED(YELLOW_PIN)
+green_led = LED(GREEN_PIN)
 
-# State tracking for Green light
-green_light_is_on = False
+# Delays in seconds
+DISPLAY_HOLD_DELAY = 3.0   # How long status lights (Red/Yellow) stay lit after processing
+INTER_FILE_DELAY = 1.0     # Cooldown pause between audio files
 
-def handle_recognized_command(text: str):
-    """Evaluates commands and manages the Green light."""
-    global green_light_is_on
-    text_lower = text.lower()
+# Raspberry Pi paths
+MODEL_PATH = "/home/pi/VOSK/model"
+AUDIO_FOLDER = "/home/pi/Vosk_Project/audio"
 
-    if "turn on" in text_lower or "turn on light" in text_lower:
-        green_light_is_on = True
-        print("  --> Action: Light turned ON")
-    elif "turn off" in text_lower or "turn off light" in text_lower:
-        green_light_is_on = False
-        print("  --> Action: Light turned OFF")
+
+def print_banner(index: int, total: int, filename: str):
+    print("\n" + "=" * 65)
+    print(f"  FILE [{index}/{total}]: {filename}")
+    print("=" * 65)
+
+
+def check_light_command(text: str) -> str:
+    """
+    Parses speech text and returns:
+      - 'ON' if an activation command is matched
+      - 'OFF' if a deactivation command is matched
+      - 'UNKNOWN' if no valid action was requested
+    """
+    t = text.lower().strip()
+
+    # Phrases to turn the light ON
+    on_phrases = [
+        "lights on",
+        "light on",
+        "turn on",
+        "turn on light",
+        "turn on lights",
+        "turn the light on",
+        "turn the lights on",
+        "switch on"
+    ]
+
+    # Phrases to turn the light OFF (including common phonetic misinterpretations)
+    off_phrases = [
+        "lights off",
+        "light off",
+        "turn off",
+        "turn off light",
+        "turn off lights",
+        "turn the light off",
+        "turn the lights off",
+        "switch off",
+        "the north"  # Common Vosk mistranscription of "turn off"
+    ]
+
+    # 1. Direct phrase matching
+    if any(phrase in t for phrase in on_phrases):
+        return "ON"
+    if any(phrase in t for phrase in off_phrases):
+        return "OFF"
+
+    # 2. Token-level keyword matching fallback
+    words = set(t.split())
+    if ("turn" in words or "light" in words or "lights" in words) and "on" in words:
+        return "ON"
+    if ("turn" in words or "light" in words or "lights" in words) and "off" in words:
+        return "OFF"
+
+    return "UNKNOWN"
+
+
+def handle_file(transcriber: VoskAudioTranscriber, file_path: str):
+    filename = os.path.basename(file_path)
+
+    # 1. Error Check & Transcription
+    try:
+        transcript = transcriber.transcribe_file(file_path)
+    except Exception as err:
+        # RED LIGHT ACTIVATION
+        red_led.on()
+        yellow_led.off()
+        print(f"  [STATUS] -> 🔴 RED LIGHT (ERROR)")
+        print(f"  [DETAIL] -> Failed to process file: {err}")
+        print(f"  [HARDWARE] -> Red: ON | Yellow: OFF | Green: {'ON' if green_led.is_lit else 'OFF'}")
+        time.sleep(DISPLAY_HOLD_DELAY)
+        red_led.off()
+        return
+
+    # 2. Yellow Check: No speech detected in audio
+    if not transcript:
+        yellow_led.on()
+        red_led.off()
+        print(f"  [STATUS] -> 🟡 YELLOW LIGHT (NO SPEECH DETECTED)")
+        print(f"  [DETAIL] -> Audio was valid, but no decipherable words recognized.")
+        print(f"  [HARDWARE] -> Red: OFF | Yellow: ON | Green: {'ON' if green_led.is_lit else 'OFF'}")
+        time.sleep(DISPLAY_HOLD_DELAY)
+        yellow_led.off()
+        return
+
+    # 3. Speech detected -> Evaluate command
+    print(f"  [TRANSCRIPT] -> \"{transcript}\"")
+    command = check_light_command(transcript)
+
+    if command == "ON":
+        green_led.on()
+        yellow_led.off()
+        red_led.off()
+        print(f"  [STATUS] -> 🟢 GREEN LIGHT TOGGLED: ON")
+        print(f"  [ACTION] -> Command matched: 'turn on'")
+        print(f"  [HARDWARE] -> Red: OFF | Yellow: OFF | Green: ON")
+        time.sleep(DISPLAY_HOLD_DELAY)
+
+    elif command == "OFF":
+        green_led.off()
+        yellow_led.off()
+        red_led.off()
+        print(f"  [STATUS] -> ⚪ GREEN LIGHT TOGGLED: OFF")
+        print(f"  [ACTION] -> Command matched: 'turn off'")
+        print(f"  [HARDWARE] -> Red: OFF | Yellow: OFF | Green: OFF")
+        time.sleep(DISPLAY_HOLD_DELAY)
+
     else:
-        print(f"  --> Recognized non-trigger text: '{text}'")
-
-    # Green light stays in its current state (ON or OFF)
-    set_light(red=False, yellow=False, green=green_light_is_on)
+        # Yellow Check: Speech detected, but no matching command found
+        yellow_led.on()
+        red_led.off()
+        print(f"  [STATUS] -> 🟡 YELLOW LIGHT (UNRECOGNIZED COMMAND)")
+        print(f"  [ACTION] -> Heard '{transcript}', but it does not match allowed commands.")
+        print(f"  [HARDWARE] -> Red: OFF | Yellow: ON | Green: {'ON' if green_led.is_lit else 'OFF'}")
+        time.sleep(DISPLAY_HOLD_DELAY)
+        yellow_led.off()
 
 
 def run_batch_test(model_path: str, audio_folder: str):
-    global green_light_is_on
+    print("*" * 65)
+    print("  STARTING RASPBERRY PI AUDIO COMMAND VERIFICATION")
+    print("*" * 65)
 
     try:
         transcriber = VoskAudioTranscriber(model_path)
         audio_files = transcriber.get_audio_files(audio_folder)
-    except FileNotFoundError as e:
-        print(f"[FATAL ERROR] {e}")
-        set_light(red=True, yellow=False, green=False)
+    except Exception as e:
+        print(f"\n[FATAL STARTUP ERROR] {e}")
+        red_led.on()
+        time.sleep(4)
+        red_led.off()
         return
 
-    print(f"\nProcessing {len(audio_files)} audio test files...\n")
+    if not audio_files:
+        print(f"[WARNING] No .wav files found in directory: {audio_folder}")
+        yellow_led.on()
+        time.sleep(3)
+        yellow_led.off()
+        return
 
-    for file_path in audio_files:
-        filename = file_path.split("\\")[-1]
-        print(f"Testing: {filename}")
+    total = len(audio_files)
+    print(f"Discovered {total} .wav file(s) for batch execution.")
 
-        try:
-            transcript = transcriber.transcribe_file(file_path)
+    for idx, file_path in enumerate(audio_files, start=1):
+        print_banner(idx, total, os.path.basename(file_path))
+        handle_file(transcriber, file_path)
+        time.sleep(INTER_FILE_DELAY)
 
-            if not transcript:
-                # Yellow Light: No speech/text detected
-                print("  --> Warning: No speech detected in audio file.")
-                set_light(red=False, yellow=True, green=green_light_is_on)
-            else:
-                # Text detected: Evaluate command for Green Light
-                print(f"  --> Detected: \"{transcript}\"")
-                handle_recognized_command(transcript)
-
-        except Exception as err:
-            # Red Light: File corruption, invalid channels/sample rate, or read error
-            print(f"  [ERROR] File issue: {err}")
-            set_light(red=True, yellow=False, green=green_light_is_on)
-
-        # Pause between files so you can observe the lights
-        time.sleep(2)
+    print("\n" + "*" * 65)
+    print("  BATCH TEST COMPLETE — ALL FILES PROCESSED")
+    print(f"  FINAL GREEN LED STATE: {'ON' if green_led.is_lit else 'OFF'}")
+    print("*" * 65)
 
 
 if __name__ == "__main__":
-    MODEL = r"C:\Users\samar\OneDrive\Documents\RasberryPi\vosk-model-small-en-us-0.15"
-    FOLDER = r"C:\Users\samar\OneDrive\Documents\Audacity"
-
     try:
-        run_batch_test(MODEL, FOLDER)
+        # Ensure all LEDs start in OFF state
+        red_led.off()
+        yellow_led.off()
+        green_led.off()
+
+        run_batch_test(MODEL_PATH, AUDIO_FOLDER)
+    except KeyboardInterrupt:
+        print("\n[ABORTED] User terminated execution.")
     finally:
-        # If using Raspberry Pi GPIO:
-        # GPIO.cleanup()
-        pass
+        # Safety clean-up
+        red_led.off()
+        yellow_led.off()
+        green_led.off()
+        red_led.close()
+        yellow_led.close()
+        green_led.close()
+        print("[SHUTDOWN] GPIO resources released cleanly.")
