@@ -1,13 +1,13 @@
 import os
 import time
 from gpiozero import LED
-from transcriber import VoskAudioTranscriber
+from core.transcriber import VoskAudioTranscriber
 
 # ==========================================
 # GPIO PIN CONFIGURATION (BCM Numbers)
 # ==========================================
 RED_PIN = 17      # Error: File missing, corrupt, or wrong format
-YELLOW_PIN = 27   # Warning: No speech recognized
+YELLOW_PIN = 27   # Warning: No speech recognized OR unrecognized command
 GREEN_PIN = 22    # Command: Turns ON/OFF based on voice commands
 
 red_led = LED(RED_PIN)
@@ -18,15 +18,66 @@ green_led = LED(GREEN_PIN)
 DISPLAY_HOLD_DELAY = 3.0   # How long status lights (Red/Yellow) stay lit after processing
 INTER_FILE_DELAY = 1.0     # Cooldown pause between audio files
 
-# Raspberry Pi paths (update to match your exact paths)
-MODEL_PATH = "/home/pi/vosk-model-small-en-us-0.15"
-AUDIO_FOLDER = "/home/pi/audio_tests"
+# Raspberry Pi paths
+MODEL_PATH = "/home/pi/VOSK/model"
+AUDIO_FOLDER = "/home/pi/Vosk_Project/audio"
 
 
 def print_banner(index: int, total: int, filename: str):
     print("\n" + "=" * 65)
     print(f"  FILE [{index}/{total}]: {filename}")
     print("=" * 65)
+
+
+def check_light_command(text: str) -> str:
+    """
+    Parses speech text and returns:
+      - 'ON' if an activation command is matched
+      - 'OFF' if a deactivation command is matched
+      - 'UNKNOWN' if no valid action was requested
+    """
+    t = text.lower().strip()
+
+    # Phrases to turn the light ON
+    on_phrases = [
+        "lights on",
+        "light on",
+        "turn on",
+        "turn on light",
+        "turn on lights",
+        "turn the light on",
+        "turn the lights on",
+        "switch on"
+    ]
+
+    # Phrases to turn the light OFF (including common phonetic misinterpretations)
+    off_phrases = [
+        "lights off",
+        "light off",
+        "turn off",
+        "turn off light",
+        "turn off lights",
+        "turn the light off",
+        "turn the lights off",
+        "switch off",
+        "the north"  # Common Vosk mistranscription of "turn off"
+    ]
+
+    # 1. Direct phrase matching
+    if any(phrase in t for phrase in on_phrases):
+        return "ON"
+    if any(phrase in t for phrase in off_phrases):
+        return "OFF"
+
+    # 2. Token-level keyword matching fallback
+    words = set(t.split())
+    if ("turn" in words or "switch" in words or "light" in words or "lights" in words):
+        if "on" in words:
+            return "ON"
+        if "off" in words:
+            return "OFF"
+
+    return "UNKNOWN"
 
 
 def handle_file(transcriber: VoskAudioTranscriber, file_path: str):
@@ -46,7 +97,7 @@ def handle_file(transcriber: VoskAudioTranscriber, file_path: str):
         red_led.off()
         return
 
-    # 2. Yellow Check (No speech detected)
+    # 2. Yellow Check: No speech detected in audio
     if not transcript:
         yellow_led.on()
         red_led.off()
@@ -57,27 +108,37 @@ def handle_file(transcriber: VoskAudioTranscriber, file_path: str):
         yellow_led.off()
         return
 
-    # 3. Green Evaluation (Speech detected)
+    # 3. Speech detected -> Evaluate command
     print(f"  [TRANSCRIPT] -> \"{transcript}\"")
-    normalized_text = transcript.lower()
+    command = check_light_command(transcript)
 
-    if "turn on" in normalized_text or "turn on light" in normalized_text:
+    if command == "ON":
         green_led.on()
+        yellow_led.off()
+        red_led.off()
         print(f"  [STATUS] -> 🟢 GREEN LIGHT TOGGLED: ON")
         print(f"  [ACTION] -> Command matched: 'turn on'")
-    elif "turn off" in normalized_text or "turn off light" in normalized_text:
+        print(f"  [HARDWARE] -> Red: OFF | Yellow: OFF | Green: ON")
+        time.sleep(DISPLAY_HOLD_DELAY)
+
+    elif command == "OFF":
         green_led.off()
+        yellow_led.off()
+        red_led.off()
         print(f"  [STATUS] -> ⚪ GREEN LIGHT TOGGLED: OFF")
         print(f"  [ACTION] -> Command matched: 'turn off'")
-    else:
-        print(f"  [STATUS] -> ⚪ NO MATCHING ACTION")
-        print(f"  [ACTION] -> Speech parsed, but not an ON/OFF command. Green state preserved.")
+        print(f"  [HARDWARE] -> Red: OFF | Yellow: OFF | Green: OFF")
+        time.sleep(DISPLAY_HOLD_DELAY)
 
-    # Status indicators remain off; show current Green light state
-    red_led.off()
-    yellow_led.off()
-    print(f"  [HARDWARE] -> Red: OFF | Yellow: OFF | Green: {'ON' if green_led.is_lit else 'OFF'}")
-    time.sleep(DISPLAY_HOLD_DELAY)
+    else:
+        # Yellow Check: Speech detected, but no matching command found
+        yellow_led.on()
+        red_led.off()
+        print(f"  [STATUS] -> 🟡 YELLOW LIGHT (UNRECOGNIZED COMMAND)")
+        print(f"  [ACTION] -> Heard '{transcript}', but it does not match allowed commands.")
+        print(f"  [HARDWARE] -> Red: OFF | Yellow: ON | Green: {'ON' if green_led.is_lit else 'OFF'}")
+        time.sleep(DISPLAY_HOLD_DELAY)
+        yellow_led.off()
 
 
 def run_batch_test(model_path: str, audio_folder: str):
@@ -118,7 +179,7 @@ def run_batch_test(model_path: str, audio_folder: str):
 
 if __name__ == "__main__":
     try:
-        # All LEDs OFF initially
+        # Ensure all LEDs start in OFF state
         red_led.off()
         yellow_led.off()
         green_led.off()
@@ -127,7 +188,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n[ABORTED] User terminated execution.")
     finally:
-        # Safety turn-off
+        # Safety clean-up
         red_led.off()
         yellow_led.off()
         green_led.off()

@@ -1,4 +1,4 @@
-"""Laptop microphone client for network_voice_server.py."""
+"""Optional laptop microphone client for the network voice server."""
 
 import argparse
 import json

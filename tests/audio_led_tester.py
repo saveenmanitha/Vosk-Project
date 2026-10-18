@@ -1,8 +1,8 @@
 """Test Raspberry Pi LED responses to commands in WAV audio files.
 
 Usage:
-    python3 audio_led_tester.py /path/to/command.wav
-    python3 audio_led_tester.py --audio-folder /path/to/audio
+    python3 -m tests.audio_led_tester /path/to/command.wav
+    python3 -m tests.audio_led_tester --audio-folder /path/to/audio
 """
 
 import argparse
@@ -11,8 +11,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from command_parser import check_light_command
-from transcriber import VoskAudioTranscriber
+from core.command_parser import check_light_command
+from core.transcriber import VoskAudioTranscriber
 
 
 class AudioLedTester:

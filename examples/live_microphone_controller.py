@@ -9,7 +9,7 @@ import queue
 import sys
 from typing import Optional
 
-from command_parser import check_light_command
+from core.command_parser import check_light_command
 
 
 class LiveVoiceLightController:

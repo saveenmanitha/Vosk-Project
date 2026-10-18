@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from typing import Optional
 
-from command_parser import check_light_command
+from core.command_parser import check_light_command
 
 
 class VoiceCommandServer:
