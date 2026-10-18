@@ -1,0 +1,15 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101827; color: #e5edf7; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 20% 0, #233b61, #101827 55%); }
+.app { width: min(680px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0; }
+.eyebrow { color: #72b4ff; text-transform: uppercase; letter-spacing: .12em; font-size: .75rem; font-weight: 700; }
+h1 { margin: 8px 0; font-size: clamp(2rem, 6vw, 3.5rem); } h2 { margin-top: 0; font-size: 1.15rem; }
+.intro, .muted, .hint { color: #9cafc6; } .card, .state-card { background: #18253a; border: 1px solid #2c405e; border-radius: 16px; padding: 22px; margin-top: 18px; }
+label, dt { color: #9cafc6; font-size: .85rem; } input { width: 100%; background: #0e1726; border: 1px solid #385171; color: inherit; border-radius: 8px; padding: 12px; margin-top: 7px; }
+.server-row { display: flex; gap: 10px; align-items: end; } .server-row input { flex: 1; } button { border: 0; border-radius: 9px; padding: 12px 18px; color: white; background: #347eea; font-weight: 700; cursor: pointer; } button:disabled { opacity: .5; cursor: not-allowed; } button.secondary { background: #2c405e; }
+.recorder { text-align: center; } .recording-indicator { display: flex; gap: 9px; justify-content: center; align-items: center; color: #b8c9de; } .dot { width: 10px; height: 10px; border-radius: 50%; background: #60738e; } .recording .dot { background: #f06b72; animation: pulse 1s infinite; }
+.record { margin: 24px 0 8px; border-radius: 999px; padding: 18px 30px; font-size: 1rem; } .record.stop { background: #c84e5c; } .error { color: #ff9299; min-height: 1.4em; } .success { color: #76dfad; }
+dl { margin: 0; } dl div { border-top: 1px solid #2c405e; padding: 13px 0; } dt { float: left; } dd { margin: 0 0 0 45%; text-align: right; font-weight: 650; }
+.states { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; } .state-card { display: flex; gap: 12px; align-items: center; margin-top: 18px; } .state-card p { margin: 4px 0 0; color: #9cafc6; font-size: .85rem; }
+.state-light { width: 17px; height: 17px; border-radius: 50%; background: #53647b; box-shadow: 0 0 0 4px #26364d; } .state-light.on { background: #ffd369; box-shadow: 0 0 14px #ffd369, 0 0 0 4px #554b30; } .state-light.status.on { background: #ffe46b; }
+@keyframes pulse { 50% { opacity: .35; } } @media (max-width: 520px) { .server-row, .states { grid-template-columns: 1fr; display: grid; } dd { margin-left: 35%; } }
