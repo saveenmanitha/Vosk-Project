@@ -44,7 +44,7 @@ class VoiceCommandServer:
         self.yellow_led.off()
         self._recognizer_type = KaldiRecognizer
 
-    def process_wav(self, audio_bytes: bytes) -> dict[str, str]:
+    def process_wav(self, audio_bytes: bytes) -> dict[str, object]:
         if len(audio_bytes) > self.max_audio_bytes:
             raise ValueError("Audio recording is too large")
 
@@ -67,7 +67,22 @@ class VoiceCommandServer:
         else:
             self.yellow_led.on()
 
-        return {"transcript": transcript, "command": command}
+        return self.status(transcript=transcript, command=command)
+
+    def status(
+        self, transcript: str = "", command: str = "UNKNOWN"
+    ) -> dict[str, object]:
+        return {
+            "transcript": transcript,
+            "command": command,
+            "light_on": self.light.is_active,
+            "status_led_on": self.yellow_led.is_active,
+            "message": {
+                "ON": "Light turned on",
+                "OFF": "Light turned off",
+                "UNKNOWN": "No supported light command was recognized",
+            }[command],
+        }
 
     def close(self) -> None:
         self.light.off()
@@ -78,6 +93,30 @@ class VoiceCommandServer:
 
 def make_handler(controller: VoiceCommandServer):
     class RequestHandler(BaseHTTPRequestHandler):
+        def _send_json(self, result: dict[str, object], status: int = 200) -> None:
+            response = json.dumps(result).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(response)))
+            self.end_headers()
+            self.wfile.write(response)
+
+        def do_OPTIONS(self) -> None:
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+
+        def do_GET(self) -> None:
+            if self.path != "/status":
+                self.send_error(404, "Use GET /status")
+                return
+            self._send_json(controller.status())
+
         def do_POST(self) -> None:
             if self.path != "/audio":
                 self.send_error(404, "Use POST /audio")
@@ -99,12 +138,7 @@ def make_handler(controller: VoiceCommandServer):
                 self.send_error(400, str(error))
                 return
 
-            response = json.dumps(result).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(response)))
-            self.end_headers()
-            self.wfile.write(response)
+            self._send_json(result)
             print(
                 f'[REQUEST] "{result["transcript"]}" -> {result["command"]}',
                 flush=True,

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice Light Controller</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <p class="eyebrow">Raspberry Pi voice control</p>
+      <h1>Voice Light Controller</h1>
+      <p class="intro">Record a command and send it to the Pi for recognition.</p>
+    </header>
+
+    <section class="card connection">
+      <label for="server-url">Pi server URL</label>
+      <div class="server-row">
+        <input id="server-url" type="url" value="http://raspberrypi.local:8765"
+               placeholder="http://192.168.1.50:8765">
+        <button id="connect-button" class="secondary">Connect</button>
+      </div>
+      <p id="connection-status" class="muted">Not connected</p>
+    </section>
+
+    <section class="card recorder">
+      <div class="recording-indicator" id="recording-indicator">
+        <span class="dot"></span><span id="recording-label">Ready to record</span>
+      </div>
+      <button id="record-button" class="record" disabled>Start recording</button>
+      <p class="hint">Try “turn on the light” or “turn off the light”.</p>
+      <p id="error-message" class="error" role="alert"></p>
+    </section>
+
+    <section class="card result">
+      <h2>Latest result</h2>
+      <dl>
+        <div><dt>Recognized command</dt><dd id="transcript">—</dd></div>
+        <div><dt>Action</dt><dd id="command">—</dd></div>
+        <div><dt>Response</dt><dd id="response">—</dd></div>
+      </dl>
+    </section>
+
+    <section class="states" aria-label="LED states">
+      <div class="state-card"><span class="state-light" id="light-state"></span><div><strong>Light</strong><p id="light-label">Unknown</p></div></div>
+      <div class="state-card"><span class="state-light status" id="status-led-state"></span><div><strong>Status LED</strong><p id="status-led-label">Unknown</p></div></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

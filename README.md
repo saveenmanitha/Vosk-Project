@@ -184,6 +184,29 @@ silence, creates a short mono 16-bit WAV file in memory, and sends it to
 processing. Use `python -m sounddevice` on the laptop and pass `--device N` if
 the desired microphone is not the default.
 
+### Browser web application
+
+The `web/` directory contains a dependency-free browser interface. The browser
+records microphone audio using `MediaRecorder`, decodes it with the Web Audio
+API, converts it to a mono 16-bit PCM WAV at 16 kHz, and sends it to the Pi's
+`POST /audio` endpoint. This avoids requiring `ffmpeg` or another media
+converter on the Raspberry Pi.
+
+Start the Pi server as above, then serve the web directory from the laptop
+(browsers generally block microphone access from a local `file://` page):
+
+```bash
+cd web
+python3 -m http.server 8080
+```
+
+Open `http://localhost:8080` in a current browser, enter the Pi server URL
+(for example `http://192.168.1.50:8765`), and select **Connect**. Allow
+microphone access, record a command, and select **Stop recording** to send it.
+The page displays the Vosk transcript, recognized action, response message,
+light state, and yellow status LED state. The server provides `GET /status`
+for the initial state and enables CORS for this LAN use.
+
 This is intentionally a separate implementation from
 `live_voice_light_controller.py`. Both versions use the same command parser,
 but the network version does not send the Vosk model or GPIO operations to the
