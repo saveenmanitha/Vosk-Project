@@ -29,7 +29,7 @@ A lightweight, 100% offline speech recognition system running on a **Raspberry P
 
 | Component Pin | Raspberry Pi Pin | Description |
 | :--- | :--- | :--- |
-| **Signal / Anode (+)** | **GPIO 17** (Physical Pin 11) | Output trigger pin |
+| **Signal / Anode (+)** | **GPIO 22** (Physical Pin 15) | Output trigger pin |
 | **GND (-)** | **GND** (Physical Pin 6 or Pin 9) | Ground reference (through 220Ω resistor for LED) |
 | **VCC (If using Relay)** | **5V** (Physical Pin 2 or 4) | Power supply for relay coil |
 
@@ -52,7 +52,7 @@ cd Vosk_Project
 
 ### 3. Install Python Libraries
 ```bash
-pip3 install vosk sounddevice RPi.GPIO
+pip3 install vosk sounddevice gpiozero
 ```
 *(Alternatively, if you use a virtual environment, activate it before installing).*
 
@@ -69,9 +69,6 @@ wget https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
 # Unzip the archive
 unzip vosk-model-small-en-us-0.15.zip
 
-# Rename the folder to 'model' so the code detects it
-mv vosk-model-small-en-us-0.15 model
-
 # Clean up zip archive
 rm vosk-model-small-en-us-0.15.zip
 ```
@@ -79,14 +76,23 @@ rm vosk-model-small-en-us-0.15.zip
 Make sure your directory structure looks like this:
 ```text
 Vosk_Project/
-├── model/                # Extracted Vosk model files
-├── main.py               # Main Python execution script
+├── vosk-model-small-en-us-0.15/  # Extracted Vosk model files
+├── live_voice_light_controller.py
 └── README.md
 ```
+
+The live controller uses the model directory shown above by default. If you
+download a different model, pass its directory with `--model`.
 
 ---
 
 ## 🚀 Running the Project
+
+### Live microphone control
+
+Connect the microphone to the Raspberry Pi (for example, a USB microphone or
+USB audio adapter). The speech recognition and GPIO control both run locally
+on the Pi; nothing is sent to a cloud service.
 
 1. **Verify your audio input device:**
    ```bash
@@ -94,14 +100,31 @@ Vosk_Project/
    ```
    Take note of your USB microphone's device index if you need to specify it in `sounddevice.RawInputStream(device=...)`.
 
-2. **Execute the script:**
+2. **Start the live controller:**
    ```bash
-   python3 main.py
+   python3 live_voice_light_controller.py
    ```
+   To select a particular microphone:
+   ```bash
+   python3 live_voice_light_controller.py --device 2
+   ```
+   The controlled light/relay is connected to BCM GPIO 22 by default. For a
+   relay module whose input is active-low, add `--active-low`.
 
 3. **Speak into the microphone:**
    - 🗣️ **"turn on the light"** ➔ GPIO pin switches to `HIGH` (Light turns ON)
    - 🗣️ **"turn off the light"** ➔ GPIO pin switches to `LOW` (Light turns OFF)
+   - Also supported: **"lights on"**, **"switch on"**, **"light off"**, and
+     **"switch off"**.
+
+Press `Ctrl+C` to stop. The controller turns the output off and releases the
+GPIO resource during shutdown.
+
+> A laptop's built-in microphone is not automatically available to a standalone
+> Raspberry Pi. Use a microphone plugged into the Pi for this local design. If
+> the microphone must remain in the laptop, an additional network audio
+> streaming client/server would be required; that would move audio transport
+> outside this project.
 
 ### Testing a recorded audio file
 
@@ -140,13 +163,16 @@ Vosk Speech Recognizer (Kaldi Engine)
 JSON Text Output Parsing (Keyword Match)
         │
         ▼
-RPi.GPIO Signal ──▶ Actuator (Relay / LED)
+gpiozero GPIO Signal ──▶ Actuator (Relay / LED)
 ```
 
-1. **Audio Ingestion:** Streams raw audio chunks in real-time through `sounddevice`.
+1. **Audio Ingestion:** Streams raw audio chunks in real-time through
+   `sounddevice` from a microphone connected to the Pi.
 2. **Offline Inference:** The Vosk model processes audio buffers locally on the Pi's CPU.
 3. **Keyword Parsing:** Python parses the JSON output stream for trigger phrases.
-4. **GPIO Actuation:** Sends a digital signal (`HIGH`/`LOW`) to control the connected circuit.
+4. **GPIO Actuation:** Sends a digital signal (`HIGH`/`LOW`) through
+   `gpiozero` to control the connected circuit. Use `--active-low` for
+   active-low relay boards.
 
 ---
 

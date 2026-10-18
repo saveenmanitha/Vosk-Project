@@ -71,10 +71,11 @@ def check_light_command(text: str) -> str:
 
     # 2. Token-level keyword matching fallback
     words = set(t.split())
-    if ("turn" in words or "light" in words or "lights" in words) and "on" in words:
-        return "ON"
-    if ("turn" in words or "light" in words or "lights" in words) and "off" in words:
-        return "OFF"
+    if ("turn" in words or "switch" in words or "light" in words or "lights" in words):
+        if "on" in words:
+            return "ON"
+        if "off" in words:
+            return "OFF"
 
     return "UNKNOWN"
 

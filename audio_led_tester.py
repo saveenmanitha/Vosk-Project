@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from command_parser import check_light_command
 from transcriber import VoskAudioTranscriber
 
 
@@ -66,41 +67,7 @@ class AudioLedTester:
 
     def check_light_command(self, text: str) -> str:
         """Return ``ON``, ``OFF``, or ``UNKNOWN`` for transcribed speech."""
-        normalized_text = text.lower().strip()
-        on_phrases = (
-            "lights on",
-            "light on",
-            "turn on",
-            "turn on light",
-            "turn on lights",
-            "turn the light on",
-            "turn the lights on",
-            "switch on",
-        )
-        off_phrases = (
-            "lights off",
-            "light off",
-            "turn off",
-            "turn off light",
-            "turn off lights",
-            "turn the light off",
-            "turn the lights off",
-            "switch off",
-            "the north",
-        )
-
-        if any(phrase in normalized_text for phrase in on_phrases):
-            return "ON"
-        if any(phrase in normalized_text for phrase in off_phrases):
-            return "OFF"
-
-        words = set(normalized_text.split())
-        if ("turn" in words or "light" in words or "lights" in words):
-            if "on" in words:
-                return "ON"
-            if "off" in words:
-                return "OFF"
-        return "UNKNOWN"
+        return check_light_command(text)
 
     def _hardware_state(self) -> str:
         return (
