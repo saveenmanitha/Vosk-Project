@@ -141,7 +141,8 @@ network_voice_client.py
 network_voice_server.py on Raspberry Pi
       │
       ├── Vosk transcription on Pi
-      └── GPIO 22 → LED/relay
+      ├── GPIO 22 → LED/relay
+      └── GPIO 27 → yellow status LED
 ```
 
 On the Raspberry Pi, find its LAN address with `hostname -I`, then start the
@@ -152,11 +153,17 @@ pip3 install vosk gpiozero
 python3 network_voice_server.py
 ```
 
-The server listens on port `8765`. If the relay is active-low:
+The server listens on port `8765`. The yellow status LED uses BCM GPIO 27 by
+default. It turns on when speech is recognized but the command is not a
+supported ON/OFF light command, and turns off after a valid ON/OFF command.
+If the relay is active-low:
 
 ```bash
 python3 network_voice_server.py --active-low
 ```
+
+If your yellow LED is wired to another BCM pin, specify it with
+`--yellow-pin N`.
 
 On the laptop, install the microphone client dependency:
 

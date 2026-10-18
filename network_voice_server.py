@@ -20,6 +20,7 @@ class VoiceCommandServer:
         self,
         model_path: str,
         light_pin: int = 22,
+        yellow_pin: int = 27,
         active_low: bool = False,
         max_audio_bytes: int = 2_000_000,
     ) -> None:
@@ -38,7 +39,9 @@ class VoiceCommandServer:
         self.max_audio_bytes = max_audio_bytes
         self.model = Model(model_path)
         self.light = LED(light_pin, active_high=not active_low)
+        self.yellow_led = LED(yellow_pin)
         self.light.off()
+        self.yellow_led.off()
         self._recognizer_type = KaldiRecognizer
 
     def process_wav(self, audio_bytes: bytes) -> dict[str, str]:
@@ -57,14 +60,20 @@ class VoiceCommandServer:
         command = check_light_command(transcript)
         if command == "ON":
             self.light.on()
+            self.yellow_led.off()
         elif command == "OFF":
             self.light.off()
+            self.yellow_led.off()
+        else:
+            self.yellow_led.on()
 
         return {"transcript": transcript, "command": command}
 
     def close(self) -> None:
         self.light.off()
+        self.yellow_led.off()
         self.light.close()
+        self.yellow_led.close()
 
 
 def make_handler(controller: VoiceCommandServer):
@@ -115,6 +124,12 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--host", default="0.0.0.0", help="Interface to listen on")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--light-pin", type=int, default=22)
+    parser.add_argument(
+        "--yellow-pin",
+        type=int,
+        default=27,
+        help="BCM GPIO pin for unrecognized-command status (default: 27)",
+    )
     parser.add_argument("--active-low", action="store_true")
     return parser.parse_args()
 
@@ -125,7 +140,10 @@ def main() -> int:
     server: Optional[ThreadingHTTPServer] = None
     try:
         controller = VoiceCommandServer(
-            arguments.model, arguments.light_pin, arguments.active_low
+            arguments.model,
+            arguments.light_pin,
+            arguments.yellow_pin,
+            arguments.active_low,
         )
         server = ThreadingHTTPServer(
             (arguments.host, arguments.port), make_handler(controller)
