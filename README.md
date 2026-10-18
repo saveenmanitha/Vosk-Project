@@ -103,6 +103,26 @@ Vosk_Project/
    - 🗣️ **"turn on the light"** ➔ GPIO pin switches to `HIGH` (Light turns ON)
    - 🗣️ **"turn off the light"** ➔ GPIO pin switches to `LOW` (Light turns OFF)
 
+### Testing a recorded audio file
+
+Use `audio_led_tester.py` to test the LED response from a WAV file without using
+the microphone:
+
+```bash
+python3 audio_led_tester.py /home/pi/Vosk_Project/audio/lights_on.wav
+```
+
+The class-based tester exposes `check_light_command`,
+`process_audio_file`, and `process_audio_folder` methods for reuse in future
+applications. To test every WAV file in a directory:
+
+```bash
+python3 audio_led_tester.py --audio-folder /home/pi/Vosk_Project/audio
+```
+
+Use `--model /path/to/model` when the Vosk model is not at the default path.
+Use `--hold-delay 0` for fast automated checks.
+
 ---
 
 ## ⚙️ How It Works
