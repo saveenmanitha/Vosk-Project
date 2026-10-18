@@ -126,6 +126,64 @@ GPIO resource during shutdown.
 > streaming client/server would be required; that would move audio transport
 > outside this project.
 
+### Separate laptop-to-Raspberry-Pi network version
+
+This version keeps the laptop microphone and moves the recognition/GPIO work to
+the Pi:
+
+```text
+Laptop microphone
+      │
+      ▼
+network_voice_client.py
+      │  HTTP WAV upload over the same LAN
+      ▼
+network_voice_server.py on Raspberry Pi
+      │
+      ├── Vosk transcription on Pi
+      └── GPIO 22 → LED/relay
+```
+
+On the Raspberry Pi, find its LAN address with `hostname -I`, then start the
+server:
+
+```bash
+pip3 install vosk gpiozero
+python3 network_voice_server.py
+```
+
+The server listens on port `8765`. If the relay is active-low:
+
+```bash
+python3 network_voice_server.py --active-low
+```
+
+On the laptop, install the microphone client dependency:
+
+```bash
+pip install sounddevice
+python network_voice_client.py --server http://PI_IP_ADDRESS:8765
+```
+
+Replace `PI_IP_ADDRESS` with the Pi address, for example:
+
+```bash
+python network_voice_client.py --server http://192.168.1.50:8765
+```
+
+The laptop client waits for speech, detects the end of the utterance using
+silence, creates a short mono 16-bit WAV file in memory, and sends it to
+`POST /audio`. The Pi returns the transcript and command result after Vosk
+processing. Use `python -m sounddevice` on the laptop and pass `--device N` if
+the desired microphone is not the default.
+
+This is intentionally a separate implementation from
+`live_voice_light_controller.py`. Both versions use the same command parser,
+but the network version does not send the Vosk model or GPIO operations to the
+laptop. For a trusted home LAN, the server is sufficient; it has a payload size
+limit and only accepts `POST /audio`, but it does not provide authentication or
+encryption.
+
 ### Testing a recorded audio file
 
 Use `audio_led_tester.py` to test the LED response from a WAV file without using
